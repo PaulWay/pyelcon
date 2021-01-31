@@ -50,7 +50,7 @@ class elcon_charger:
     self.input_voltage = ((msg.data[4] & 0x04) != 0)
     self.no_battery = ((msg.data[4] & 0x08) != 0)
     self.timeout = ((msg.data[4] & 0x10) != 0)
-  return (self.voltage, self.current, self.hardware_failure, self.over_temperature, self.input_voltage, self.no_battery, self.timeout)
+    return (self.voltage, self.current, self.hardware_failure, self.over_temperature, self.input_voltage, self.no_battery, self.timeout)
 
 
   def pack_command(voltage: float, current: float, enable: bool) -> Message:
@@ -74,7 +74,7 @@ class elcon_charger:
         r=0
         dp=0
         priority=6
-
+        
         msg.id = pack_elcon_id(priority, r, dp, pf, elcon_charger_id, elcon_manager_id)
         msg.is_extended_id = True
         msg.dlc = 5
