@@ -11,7 +11,7 @@ elcon_broadcast_id = 0x50
 elcon_inverter_id = 0xEF
 
 
-class elcon_charger:
+class ElconCharger:
   voltage = float(0)
   current = float(0)
   hardware_failure = False
@@ -42,15 +42,17 @@ class elcon_charger:
 
   def unpack_status(self, msg: Message):
     (priority, r, dp, pf, destination, source) = unpack_elcon_id(msg.arbitration_id)
-    if source == elcon_charger_id
-    self.voltage = ((msg.data[0] << 8) | (msg.data[1]))/10
-    self.current = ((msg.data[2] << 8) | (msg.data[3]))/10
-    self.hardware_failure = ((msg.data[4] & 0x01) != 0)
-    self.over_temperature = ((msg.data[4] & 0x02) != 0)
-    self.input_voltage = ((msg.data[4] & 0x04) != 0)
-    self.no_battery = ((msg.data[4] & 0x08) != 0)
-    self.timeout = ((msg.data[4] & 0x10) != 0)
-    return (self.voltage, self.current, self.hardware_failure, self.over_temperature, self.input_voltage, self.no_battery, self.timeout)
+    if source == elcon_charger_id:
+      self.voltage = ((msg.data[0] << 8) | (msg.data[1]))/10
+      self.current = ((msg.data[2] << 8) | (msg.data[3]))/10
+      self.hardware_failure = ((msg.data[4] & 0x01) != 0)
+      self.over_temperature = ((msg.data[4] & 0x02) != 0)
+      self.input_voltage = ((msg.data[4] & 0x04) != 0)
+      self.no_battery = ((msg.data[4] & 0x08) != 0)
+      self.timeout = ((msg.data[4] & 0x10) != 0)
+      return (self.voltage, self.current, self.hardware_failure, self.over_temperature, self.input_voltage, self.no_battery, self.timeout)
+    raise ValueError("Source of message is not the charger")
+
 
 
   def pack_command(voltage: float, current: float, enable: bool) -> Message:
@@ -74,7 +76,7 @@ class elcon_charger:
         r=0
         dp=0
         priority=6
-        
+
         msg.id = pack_elcon_id(priority, r, dp, pf, elcon_charger_id, elcon_manager_id)
         msg.is_extended_id = True
         msg.dlc = 5
@@ -83,9 +85,9 @@ class elcon_charger:
 
 
 
-def check_pack_id():
+def test_pack_id():
   pf=6
   r=0
   dp=0
   priority=6
-  return (0x1806E5F4 == pack_elcon_id(priority, r, dp, pf, elcon_charger_id, elcon_manager_id))
+  return (0x1806E5F4 == ElconCharger.pack_elcon_id(priority, r, dp, pf, elcon_charger_id, elcon_manager_id))
