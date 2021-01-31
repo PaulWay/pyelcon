@@ -1,11 +1,11 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "62e4fb85f50276d5d3b7ee2edffec60703dd84c6d70a478c353fe94c67cc525d"
+            "sha256": "dc61224ebc884afcb8c72057c556ea606f428423d5e427d24319a468c0a783e1"
         },
         "pipfile-spec": 6,
         "requires": {
-            "python_version": "3.8"
+            "python_version": "3.5"
         },
         "sources": [
             {
@@ -18,11 +18,11 @@
     "default": {
         "aenum": {
             "hashes": [
-                "sha256:81828d1fbe20b6b188d75b21a0fa936d7d929d839ef843ef385d9c2a97082864",
-                "sha256:85adabd63183d283250bf7acd9fa23c7e45b1c8d1efbb84b233160f3c438dc18",
-                "sha256:bcb4fd350d36af336b6b5898e5d89f76344621d9c1b2de69c81acf1d3e6b1145"
+                "sha256:17cd8cfed1ee4b617198c9fabbabd70ebd8f01e54ac29cd6c3a92df14bd86656",
+                "sha256:58b899111b3fa9f9569e30c6305b07308f5b0dfdbbd2a9b9f01e8e08def7fdbb",
+                "sha256:701c4fecd4c5237ed5ab80a18930a0ebe26a8c729a21e1b7302197a3f430da7c"
             ],
-            "version": "==2.2.4"
+            "version": "==3.0.0"
         },
         "paho-mqtt": {
             "hashes": [
