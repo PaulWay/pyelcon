@@ -68,7 +68,7 @@ class ElconCharger(object):
         not changed since the last message was received.
         """
         (destination, source) = self.unpack_elcon_id(msg.arbitration_id)
-        if source == elcon_charger_id:
+        if source != elcon_charger_id:
             print(f"Ignoring message from {source} to {destination}")
             return False  # Status is not up to date
 
@@ -83,6 +83,13 @@ class ElconCharger(object):
         return True  # Status is up to date, can use properties
 
     def pack_command(self, voltage: float, current: float, enable: bool) -> Message:
+        """
+        Pack a command to the charger to set its output voltage and current
+        and enable flag.
+
+        The message is sent from the Elcon manager ID (as defined above), and
+        uses the class's current flags (as packed by `pack_elcon_id` above).
+        """
         if voltage == 0 or current == 0:
             print("Not sending a message - voltage and current must be positive")
             return None

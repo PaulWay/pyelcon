@@ -22,7 +22,7 @@ class ElconChargerTests(unittest.TestCase):
 
     def test_unpack_status(self):
         ec = ElconCharger()
-        msg = Message(arbitration_id=0x1806E5F4, data=b'\x01\x00\x00\x10\x08')
+        msg = Message(arbitration_id=0x1806F4E5, data=b'\x01\x00\x00\x10\x08')
         # Message is from the charger, can decode
         self.assertTrue(ec.unpack_status(msg))
         # Check message details
