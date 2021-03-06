@@ -3,6 +3,7 @@
 # Licensed under the GPL V3
 
 from can import Message
+from struct import pack, unpack
 
 elcon_charger_id = 0xE5
 elcon_manager_id = 0xF4
@@ -27,65 +28,66 @@ class ElconCharger(object):
 
     def pack_elcon_id(self, destination:int, source:int) -> int:
         """
-        Pack the header as required by the
+        Pack the header as required by the Elcon CANBUS instructions.
+
+        Uses the class's existing `pf`, `r`, `dp` and `priority` values,
+        plus the given destination and source.
         """
-        # top_byte = ((self.priority & 0x07) << 2) | \
-        #            ((self.r        & 0x01) << 1) | \
-        #            (self.dp       & 0x01)
-        # return pack()
-        elcon_id =  ((self.priority & 0x07) << 26) | \
-                    ((self.r        & 0x01) << 25) | \
-                    ((self.dp       & 0x01) << 24) | \
-                    ((self.pf       & 0xff) << 16) | \
-                    ((destination   & 0xff) << 8) | \
-                    ((source        & 0xff))
-        return elcon_id
+        top_byte = ((self.priority & 0x07) << 2) | \
+                   ((self.r        & 0x01) << 1) | \
+                   (self.dp       & 0x01)
+        return pack('4B', top_byte, self.pf, destination, source)
 
     def unpack_elcon_id(self, elcon_id: int):
-        priority =       ((elcon_id >> 26) & 0x07)
-        r =              ((elcon_id >> 25) & 0x01)
-        dp =             ((elcon_id >> 24) & 0x01)
-        pf =             ((elcon_id >> 16) & 0xff)
-        # Throw those away, we only care about the below:
-        destination =    ((elcon_id >> 8)  & 0xff)
-        source =         ((elcon_id >> 0)  & 0xff)
+        """
+        Unpack the Elcon header for the destination and source addresses.
+
+        This throws the given `pf`, `r`, `dp` and `priority` values away and
+        just returns the destination and source as a tuple.
+        """
+        top_byte, pf, destination, source = unpack('4B', elcon_id)
         return (destination, source)
 
     def unpack_status(self, msg: Message):
+        """
+        Given a CANBUS message, attempts to unpack the Elcon charger status.
+
+        If this message is from the Elcon charger ID (0xE5, as defined above),
+        then the object's `voltage` and `current` values, and the
+        `hardware_failure`, `over_temperature`, `input_voltage`, `timeout` and
+        `no_battery` flags will be updated, and `True` will be returned to
+        indicate that the status is up to date.  Voltage and current are
+        accurate to tenths of a unit.
+
+        If this message is not from the Elcon charger, then it is ignored, and
+        `False` is returned to indicate that the charger status values have
+        not changed since the last message was received.
+        """
         (destination, source) = unpack_elcon_id(msg.arbitration_id)
         if source == elcon_charger_id:
-            print("Ignoring message")
+            print(f"Ignoring message from {source} to {destination}")
             return False  # Status is not up to date
 
-        self.voltage = ((msg.data[0] << 8) | (msg.data[1]))/10
-        self.current = ((msg.data[2] << 8) | (msg.data[3]))/10
-        self.hardware_failure = ((msg.data[4] & 0x01) != 0)
-        self.over_temperature = ((msg.data[4] & 0x02) != 0)
-        self.input_voltage = ((msg.data[4] & 0x04) != 0)
-        self.no_battery = ((msg.data[4] & 0x08) != 0)
-        self.timeout = ((msg.data[4] & 0x10) != 0)
+        (voltage, current, flags) = unpack('HHB', msg.data)
+        self.voltage = float(voltage) / 10
+        self.current = float(current) / 10
+        self.hardware_failure = (flags & 0x01) != 0
+        self.over_temperature = (flags & 0x02) != 0
+        self.input_voltage = (flags & 0x04) != 0
+        self.no_battery = (flags & 0x08) != 0
+        self.timeout = (flags & 0x10) != 0
         return True  # Status is up to date, can use properties
 
     def pack_command(self, voltage: float, current: float, enable: bool) -> Message:
-        msg = Message()
         if voltage == 0 or current == 0:
-            raise ValueError("positive voltage and current")
+            print("Not sending a message - voltage and current must be positive")
+            return None
+        msg = Message()
         v = int(voltage * 10)
         i = int(voltage * 10)
         msg.dlc = 5
-        msg.data = bytearray(5)
-        msg.data[0] = (v >> 8) & 0xff
-        msg.data[1] = (v) & 0xff
-        msg.data[2] = (i >> 8) & 0xff
-        msg.data[3] = (i) & 0xff
-        msg.data[4] = 1 if enable else 0
-
         msg.id = self.pack_elcon_id(elcon_charger_id, elcon_manager_id)
+        flags = 1 if enable else 0
+        msg.data = pack("HHB", v, i, flags)
         msg.is_extended_id = True
         return msg
-
-
-
-def test_pack_id():
-    ec = ElconCharger()
-    return (0x1806E5F4 == ec.pack_elcon_id(elcon_charger_id, elcon_manager_id))
