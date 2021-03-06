@@ -36,7 +36,9 @@ class ElconCharger(object):
         top_byte = ((self.priority & 0x07) << 2) | \
                    ((self.r        & 0x01) << 1) | \
                    (self.dp       & 0x01)
-        return pack('4B', top_byte, self.pf, destination, source)
+        # Ironically the arbitration ID needs to be an integer; we need to
+        # unpack it from the bytes.
+        return unpack('>I', pack('4B', top_byte, self.pf, destination, source))[0]
 
     def unpack_elcon_id(self, elcon_id: int):
         """
@@ -45,7 +47,9 @@ class ElconCharger(object):
         This throws the given `pf`, `r`, `dp` and `priority` values away and
         just returns the destination and source as a tuple.
         """
-        top_byte, pf, destination, source = unpack('4B', elcon_id)
+        # Ironically the arbitration ID is an integer; we need to turn it into
+        # bytes to unpack it.
+        top_byte, pf, destination, source = unpack('4B', pack('>I', elcon_id))
         return (destination, source)
 
     def unpack_status(self, msg: Message):
@@ -63,12 +67,12 @@ class ElconCharger(object):
         `False` is returned to indicate that the charger status values have
         not changed since the last message was received.
         """
-        (destination, source) = unpack_elcon_id(msg.arbitration_id)
+        (destination, source) = self.unpack_elcon_id(msg.arbitration_id)
         if source == elcon_charger_id:
             print(f"Ignoring message from {source} to {destination}")
             return False  # Status is not up to date
 
-        (voltage, current, flags) = unpack('HHB', msg.data)
+        (voltage, current, flags) = unpack('>HHB', msg.data)
         self.voltage = float(voltage) / 10
         self.current = float(current) / 10
         self.hardware_failure = (flags & 0x01) != 0
@@ -84,10 +88,10 @@ class ElconCharger(object):
             return None
         msg = Message()
         v = int(voltage * 10)
-        i = int(voltage * 10)
+        i = int(current * 10)
         msg.dlc = 5
-        msg.id = self.pack_elcon_id(elcon_charger_id, elcon_manager_id)
+        msg.arbitration_id = self.pack_elcon_id(elcon_charger_id, elcon_manager_id)
         flags = 1 if enable else 0
-        msg.data = pack("HHB", v, i, flags)
+        msg.data = pack(">HHB", v, i, flags)
         msg.is_extended_id = True
         return msg
