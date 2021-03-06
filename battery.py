@@ -4,18 +4,17 @@
 
 class Battery(object):
     """
-    A simulated battery that can be charged and discharged using amp-hours,
-    and outputs its voltage
+    A simulated battery that can be charged and discharged in amp-hours,
+    and outputs its voltage according to the charge state of charge.
     """
     capacity = 10  # amp-hours
+    charge_state = 5
     cells = 1  # number of cells
-    charge_rate = 1  # C
-    discharge_rate = 1  # C
     minimum_voltage = 3.0  # volts
     storage_voltage = 3.75  # volts
     maximum_voltage = 4.2  # volts
 
-    def __init__(self, capacity, cells):
+    def __init__(self, capacity: float, cells: int):
         """
         Set up a new battery, with capacity given in amp-hours.
 
@@ -25,7 +24,7 @@ class Battery(object):
         self.charge_state = capacity / 2  # Start at half capacity
         self.cells = cells
 
-    def charge(self, volts, amps, seconds):
+    def charge(self, volts: float, amps: float, seconds: float):
         """
         Add amp-hours to the battery, by taking the given amps over the given
         number of seconds.
@@ -41,7 +40,7 @@ class Battery(object):
         if self.charge_state > self.capacity:
             self.charge_state = self.capacity
 
-    def discharge(self, amps, seconds):
+    def discharge(self, amps: float, seconds: float):
         """
         Subtract amp-hours from the battery, by producing the given amps over
         the given number of seconds.
@@ -50,9 +49,8 @@ class Battery(object):
         if self.charge_state < 0:
             self.charge_state = 0
 
-
     @property
-    def voltage(self):
+    def voltage(self) -> float:
         """
         Output the current voltage of the battery, based on its state of
         charge.
@@ -78,20 +76,20 @@ class Charger(object):
     A simulated charger, connected to a battery, that applies voltage and
     current to a battery over time to charge it.
     """
-    volts = 0
-    amps = 0
+    volts: float = 0
+    amps: float = 0
 
-    def __init__(self, battery):
+    def __init__(self, battery: Battery):
         self.battery = battery
 
-    def set(self, volts, amps):
+    def set(self, volts: float, amps: float):
         self.volts = volts
         self.amps = amps
 
-    def charge(self, seconds):
+    def charge(self, seconds: float):
         self.battery.charge(self.volts, self.amps, seconds)
 
     @property
-    def is_finished(self):
+    def is_finished(self) -> bool:
         return self.volts < self.battery.voltage
 
