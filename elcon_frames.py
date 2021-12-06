@@ -5,28 +5,37 @@
 from can import Message
 from struct import pack, unpack
 
-elcon_charger_id = 0xE5
-elcon_manager_id = 0xF4
-elcon_broadcast_id = 0x50
-elcon_inverter_id = 0xEF
+elcon_charger_id = 0xE5  # 229
+elcon_manager_id = 0xF4  # 244
+elcon_broadcast_id = 0x50  # 80
+elcon_inverter_id = 0xEF  # 239
 
 
-class ElconCharger(object):
-    voltage = float(0)
-    current = float(0)
-    hardware_failure = False
-    over_temperature = False
-    input_voltage = False
-    no_battery = False
-    timeout = False
+class ElconUtils(object):
+    # Settings sent to and received from the charger
+    voltage: float = float(0)
+    current: float = float(0)
+    hardware_failure: bool = False
+    over_temperature: bool = False
+    input_voltage: bool = False
+    no_battery: bool = False
+    timeout: bool = False
 
-    #No idea what these are, but keep them as they are for now
-    pf=6
-    r=0
-    dp=0
-    priority=6
+    # Metadata - what we're receiving from and sending to
+    source_id: int = elcon_manager_id  # 'us'
+    destination_id: int = elcon_charger_id  # 'them'
 
-    def pack_elcon_id(self, destination:int, source:int) -> int:
+    # No idea what these are, but keep them as they are for now
+    pf = 6
+    r = 0
+    dp = 0
+    priority = 6
+
+    def __init__(self, source_id, destination_id: int):
+        self.source_id = source_id
+        self.destination_id = destination_id
+
+    def pack_elcon_id(self, source:int, destination:int) -> int:
         """
         Pack the header as required by the Elcon CANBUS instructions.
 
@@ -50,13 +59,13 @@ class ElconCharger(object):
         # Ironically the arbitration ID is an integer; we need to turn it into
         # bytes to unpack it.
         top_byte, pf, destination, source = unpack('4B', pack('>I', elcon_id))
-        return (destination, source)
+        return (source, destination)
 
     def unpack_status(self, msg: Message):
         """
         Given a CANBUS message, attempts to unpack the Elcon charger status.
 
-        If this message is from the Elcon charger ID (0xE5, as defined above),
+        If this message is from the our source ID (nominally the Elcon charger),
         then the object's `voltage` and `current` values, and the
         `hardware_failure`, `over_temperature`, `input_voltage`, `timeout` and
         `no_battery` flags will be updated, and `True` will be returned to
@@ -67,9 +76,9 @@ class ElconCharger(object):
         `False` is returned to indicate that the charger status values have
         not changed since the last message was received.
         """
-        (destination, source) = self.unpack_elcon_id(msg.arbitration_id)
-        if source != elcon_charger_id:
-            print(f"Ignoring message from {source} to {destination}")
+        (pkt_source, pkt_dest) = self.unpack_elcon_id(msg.arbitration_id)
+        if pkt_source != self.destination_id:
+            print(f"Ignoring message from {pkt_source} to {pkt_dest}")
             return False  # Status is not up to date
 
         (voltage, current, flags) = unpack('>HHB', msg.data)
@@ -97,7 +106,7 @@ class ElconCharger(object):
         v = int(voltage * 10)
         i = int(current * 10)
         msg.dlc = 5
-        msg.arbitration_id = self.pack_elcon_id(elcon_charger_id, elcon_manager_id)
+        msg.arbitration_id = self.pack_elcon_id(self.source_id, self.destination_id)
         flags = 1 if enable else 0
         msg.data = pack(">HHB", v, i, flags)
         msg.is_extended_id = True
