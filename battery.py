@@ -5,7 +5,7 @@
 class Battery(object):
     """
     A simulated battery that can be charged and discharged in amp-hours,
-    and outputs its voltage according to the charge state of charge.
+    and outputs its voltage according to the state of charge.
     """
     capacity = 10  # amp-hours
     charge_state = 5
@@ -27,10 +27,14 @@ class Battery(object):
     def charge(self, volts: float, amps: float, seconds: float):
         """
         Add amp-hours to the battery, by taking the given amps over the given
-        number of seconds.
+        number of seconds.  Will not over-charge the battery.
 
         Will not charge if the given voltage is less than the battery's
-        voltage.
+        voltage.  However, this is only checked at the start of the charge
+        period - it does not attempt to predict when the battery might
+        'float' at that charge.  Calls with large numbers of seconds may push
+        the battery over the input volts, but will not go over the battery's
+        capacity.
 
         No real attention to 'power' in watts or yet.
         """
@@ -67,7 +71,7 @@ class Battery(object):
              * vrange + self.minimum_voltage
         ) * self.cells
 
-    def __str__(self):
+    def __repr__(self):
         return f"{self.capacity}Ah {self.cells}S battery with {self.charge_state:.3f}Ah charge"
 
 
@@ -93,3 +97,5 @@ class Charger(object):
     def is_finished(self) -> bool:
         return self.volts < self.battery.voltage
 
+    def __repr__(self):
+        return f"Charger currently running at {self.volts:.2f}V {self.amps:.2f}A"
