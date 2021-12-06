@@ -5,9 +5,9 @@ verify_ssl = true
 
 [packages]
 python-can = "*"
-paho-mqtt = "*"
+# paho-mqtt = "*"
 
 [requires]
-python_version = "3.6"
+python_version = "3.9"
 
 [dev-packages]
