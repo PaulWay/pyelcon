@@ -11,3 +11,4 @@ python-can = "*"
 python_version = "3.9"
 
 [dev-packages]
+flake8 = "*"
