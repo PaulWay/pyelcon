@@ -23,15 +23,13 @@ class ElconCharger(object):
     def __init__(self, bus, charger):
         self.charger = charger
         self.bus = bus
-        self.utils = ElconUtils(
-            source_id=elcon_charger_id, destination_id=elcon_manager_id
-        )
+        self.utils = ElconUtils(our_id=elcon_charger_id)
         self.active = False
         self.last_time = datetime.now()
 
     async def emit_status(self):
         """
-        Emit the charger's status every interval
+        Emit the charger's status every interval, to console and on CANBUS
         """
         while True:
             if self.active:
@@ -39,6 +37,11 @@ class ElconCharger(object):
             else:
                 print(f"Charger inactive, last update {self.last_time:%X}")
             print(f"... Battery: {self.charger.battery}")
+            msg = self.utils.pack_command(
+                elcon_manager_id, self.charger.volts, self.charger.amps, enable=True
+            )
+            if msg:  # voltage / current too low = None for msg
+                self.bus.send(msg)
             await asyncio.sleep(self.status_interval)
 
     async def check_timeout(self):
@@ -67,7 +70,8 @@ class ElconCharger(object):
                 if self.verbose:
                     print(f"... set to {self.charger.volts:.2f}V {self.charger.amps:.2f}A")
             else:
-                print(f"Ignoring {msg}")
+                if self.verbose:
+                    print(f"Ignoring {msg}")
 
     async def main(self):
         loop = asyncio.get_event_loop()
@@ -104,9 +108,7 @@ class ChargerDriver(object):
 
     def __init__(self, bus):
         self.bus = bus
-        self.utils = ElconUtils(
-            source_id=elcon_manager_id, destination_id=elcon_charger_id
-        )
+        self.utils = ElconUtils(our_id=elcon_manager_id)
         self.running = False
 
     def _curb_amps_to_power(self):
@@ -119,7 +121,9 @@ class ChargerDriver(object):
         """
         while self.running:
             self._curb_amps_to_power()
-            msg = self.utils.pack_command(self.volts, self.amps, enable=True)
+            msg = self.utils.pack_command(
+                elcon_charger_id, self.volts, self.amps, enable=True
+            )
             if msg is not None:
                 self.bus.send(msg)
                 if self.verbose:
@@ -148,5 +152,8 @@ can0 = can.Bus('vcan0', bustype='socketcan')
 bat = Battery(capacity=10, cells=30)
 chg = Charger(bat)
 driver = ChargerDriver(can0)
+driver.volts = 120
+driver.amps = 10
+driver.start()
 
 sim = ElconCharger(can0, chg)

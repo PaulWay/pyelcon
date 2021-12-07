@@ -21,9 +21,8 @@ class ElconUtils(object):
     no_battery: bool = False
     timeout: bool = False
 
-    # Metadata - what we're receiving from and sending to
-    source_id: int = elcon_manager_id  # 'us'
-    destination_id: int = elcon_charger_id  # 'them'
+    # The CANBUS ID we receive messages to, and send them from
+    our_id: int
 
     # No idea what these are, but keep them as they are for now
     pf = 6
@@ -31,9 +30,8 @@ class ElconUtils(object):
     dp = 0
     priority = 6
 
-    def __init__(self, source_id, destination_id: int):
-        self.source_id = source_id
-        self.destination_id = destination_id
+    def __init__(self, our_id: int):
+        self.our_id = our_id
 
     def pack_elcon_id(self, source:int, destination:int) -> int:
         """
@@ -77,7 +75,8 @@ class ElconUtils(object):
         not changed since the last message was received.
         """
         (pkt_source, pkt_dest) = self.unpack_elcon_id(msg.arbitration_id)
-        if pkt_source != self.destination_id:
+        # Receive a message from a source to us (the destination)
+        if pkt_dest != self.our_id:
             print(f"Ignoring message from {pkt_source} to {pkt_dest}")
             return False  # Status is not up to date
 
@@ -91,7 +90,9 @@ class ElconUtils(object):
         self.timeout = (flags & 0x10) != 0
         return True  # Status is up to date, can use properties
 
-    def pack_command(self, voltage: float, current: float, enable: bool) -> Message:
+    def pack_command(
+        self, pkt_dest: int, voltage: float, current: float, enable: bool
+    ) -> Message:
         """
         Pack a command to the charger to set its output voltage and current
         and enable flag.
@@ -106,7 +107,8 @@ class ElconUtils(object):
         v = int(voltage * 10)
         i = int(current * 10)
         msg.dlc = 5
-        msg.arbitration_id = self.pack_elcon_id(self.source_id, self.destination_id)
+        # Send a message from us (source) to the destination
+        msg.arbitration_id = self.pack_elcon_id(self.our_id, pkt_dest)
         flags = 1 if enable else 0
         msg.data = pack(">HHB", v, i, flags)
         msg.is_extended_id = True
