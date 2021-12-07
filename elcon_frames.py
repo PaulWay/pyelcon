@@ -96,13 +96,14 @@ class ElconUtils(object):
     ) -> Message:
         """
         Pack a command to the charger to set its output voltage and current
-        and enable flag.
+        and enable flag.  Alternately, pack the charger's current output and
+        state to the rest of the world.
 
-        The message is sent from the Elcon manager ID (as defined above), and
-        uses the class's current flags (as packed by `pack_elcon_id` above).
+        The message is sent from the class's ID, and uses the class's current
+        flags (as packed by `pack_elcon_id` above).
         """
-        if voltage == 0 or current == 0:
-            print("Not sending a message - voltage and current must be positive")
+        if voltage == 0:
+            print("Not sending a message - voltage must be positive")
             return None
         msg = Message()
         v = int(voltage * 10)
