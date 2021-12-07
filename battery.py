@@ -73,29 +73,3 @@ class Battery(object):
 
     def __repr__(self):
         return f"{self.capacity}Ah {self.cells}S battery with {self.charge_state:.3f}Ah charge"
-
-
-class Charger(object):
-    """
-    A simulated charger, connected to a battery, that applies voltage and
-    current to a battery over time to charge it.
-    """
-    volts: float = 0
-    amps: float = 0
-
-    def __init__(self, battery: Battery):
-        self.battery = battery
-
-    def set(self, volts: float, amps: float):
-        self.volts = volts
-        self.amps = amps
-
-    def charge(self, seconds: float):
-        self.battery.charge(self.volts, self.amps, seconds)
-
-    @property
-    def is_finished(self) -> bool:
-        return self.volts < self.battery.voltage
-
-    def __repr__(self):
-        return f"Charger currently running at {self.volts:.2f}V {self.amps:.2f}A"

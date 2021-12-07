@@ -4,8 +4,10 @@ import asyncio
 # from can import Bus, Message, Listener
 import can
 
-from battery import Battery, Charger
-from elcon_frames import ElconUtils, elcon_charger_id, elcon_manager_id
+from battery import Battery
+from elcon_frames import (
+    ElconUtils, elcon_charger_id, elcon_manager_id, elcon_broadcast_id
+)
 
 
 class ElconCharger(object):
@@ -20,12 +22,15 @@ class ElconCharger(object):
     update_timeout = 2
     verbose = True
 
-    def __init__(self, bus, charger):
-        self.charger = charger
+    def __init__(self, bus, battery):
+        self.battery = battery
         self.bus = bus
         self.utils = ElconUtils(our_id=elcon_charger_id)
         self.active = False
         self.last_time = datetime.now()
+        self.volts: float = 0.0
+        self.amps: float = 0.0
+        self.output_amps: float = 0.0
 
     async def emit_status(self):
         """
@@ -33,12 +38,15 @@ class ElconCharger(object):
         """
         while True:
             if self.active:
-                print(f"Charger active, set to {self.charger.volts:.2f}V {self.charger.amps:.2f}A")
+                print(
+                    f"Charger active, set to {self.volts:.2f}V "
+                    f"{self.amps:.2f}A, output {self.output_amps:.2f}A"
+                )
             else:
                 print(f"Charger inactive, last update {self.last_time:%X}")
-            print(f"... Battery: {self.charger.battery}")
+            print(f"... Battery: {self.battery} at {self.battery.voltage:.2f}V")
             msg = self.utils.pack_command(
-                elcon_manager_id, self.charger.volts, self.charger.amps, enable=True
+                elcon_broadcast_id, self.volts, self.output_amps, enable=True
             )
             if msg:  # voltage / current too low = None for msg
                 self.bus.send(msg)
@@ -47,7 +55,8 @@ class ElconCharger(object):
     async def check_timeout(self):
         while True:
             if datetime.now() - self.last_time > timedelta(seconds=self.update_timeout):
-                self.active=False
+                self.active = False
+                self.utils.timeout = True
             await asyncio.sleep(self.status_interval)  # or update_timeout?
 
     async def read_messages(self):
@@ -55,20 +64,26 @@ class ElconCharger(object):
             if self.utils.unpack_status(msg):
                 charge_time = 0.0
                 now = datetime.now()
+                # Transfer data from utils message to voltage
+                self.volts = self.utils.voltage
+                self.amps = self.utils.current
                 if self.active:
                     # Calculate time to charge battery from previous time
                     charge_time = (now - self.last_time).seconds
-                    if self.verbose:
-                        print(f"... charging battery for {charge_time:.2f} seconds")
-                    self.charger.charge(charge_time)
+                    if self.battery.voltage > self.volts:
+                        self.output_amps = 0.0
+                    else:
+                        self.battery.charge(self.volts, self.amps, charge_time)
+                        self.output_amps = self.amps
+                else:
+                    self.active = True
+                    self.utils.timeout = False
                 self.last_time = now
-                self.active = True
-                # Transfer data from utils message to voltage
-                # Probably a better way to do this at some point...
-                self.charger.volts = self.utils.voltage
-                self.charger.amps = self.utils.current
-                if self.verbose:
-                    print(f"... set to {self.charger.volts:.2f}V {self.charger.amps:.2f}A")
+                # if self.verbose:
+                #     print(
+                #         f"... set to {self.volts:.2f}V {self.amps:.2f}A, "
+                #         f"output {self.output_amps:.2f}A"
+                #     )
             else:
                 if self.verbose:
                     print(f"Ignoring {msg}")
@@ -76,18 +91,13 @@ class ElconCharger(object):
     async def main(self):
         loop = asyncio.get_event_loop()
         self.reader = can.AsyncBufferedReader()
-        listeners = [
-            self.reader,
-            # self.emit_status,
-            # self.check_timeout,
-            # self.read_messages,
-        ]
-        notifier = can.Notifier(self.bus, listeners, loop=loop)
+        notifier = can.Notifier(self.bus, [self.reader], loop=loop)
         await asyncio.gather(
             self.emit_status(),
             self.check_timeout(),
             self.read_messages(),
         )
+        notifier.stop()
 
 
 class ChargerDriver(object):
@@ -115,6 +125,13 @@ class ChargerDriver(object):
         if (self.volts * self.amps) / self.efficiency_pct > self.max_watts:
             self.amps = (self.max_watts / self.volts) * self.efficiency_pct
 
+    def start(self):
+        self.running = True
+        # Start task here
+
+    def finish(self):
+        self.running = False
+
     async def send_message(self):
         """
         Send the message to the charger.
@@ -127,15 +144,39 @@ class ChargerDriver(object):
             if msg is not None:
                 self.bus.send(msg)
                 if self.verbose:
-                    print(f"ChargerDriver sent {msg}")
+                    print(f"Charger told to run at {self.volts:.2f}V {self.amps:.2f}A")
             await asyncio.sleep(self.update_time)
 
-    def start(self):
-        self.running = True
-        # Start task here
+    async def receive_status(self):
+        """
+        Receive status from charger, report status
+        """
+        async for msg in self.reader:
+            if self.utils.unpack_status(msg):
+                print(
+                    f"Received from charger: {self.utils.voltage:.2f}V "
+                    f"{self.utils.current:.2f}A "
+                    f"HW={'XX' if self.utils.hardware_failure else 'OK'} "
+                    f"Temp={'XX' if self.utils.over_temperature else 'OK'} "
+                    f"Vin={'XX' if self.utils.input_voltage else 'OK'} "
+                    f"Bat={'No' if self.utils.no_battery else 'OK'} "
+                    f"T/O={'XX' if self.utils.timeout else 'OK'} "
+                )
+            else:
+                pass
 
-    def finish(self):
-        self.running = False
+    async def main(self):
+        """
+        Run the receive and send coroutines
+        """
+        loop = asyncio.get_event_loop()
+        self.reader = can.AsyncBufferedReader()
+        notifier = can.Notifier(self.bus, [self.reader], loop=loop)
+        await asyncio.gather(
+            self.send_message(),
+            self.receive_status(),
+        )
+        notifier.stop()
 
 
 """
@@ -150,10 +191,9 @@ asyncio.run(cd.send_message())
 
 can0 = can.Bus('vcan0', bustype='socketcan')
 bat = Battery(capacity=10, cells=30)
-chg = Charger(bat)
 driver = ChargerDriver(can0)
 driver.volts = 120
 driver.amps = 10
 driver.start()
 
-sim = ElconCharger(can0, chg)
+sim = ElconCharger(can0, bat)
