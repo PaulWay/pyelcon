@@ -76,11 +76,12 @@ class ElconUtils(object):
         """
         (pkt_source, pkt_dest) = self.unpack_elcon_id(msg.arbitration_id)
         # Receive a message from a source to us (the destination)
-        if pkt_dest != self.our_id:
+        if not (pkt_dest == self.our_id or pkt_dest == elcon_broadcast_id):
             print(f"Ignoring message from {pkt_source} to {pkt_dest}")
             return False  # Status is not up to date
 
         (voltage, current, flags) = unpack('>HHB', msg.data)
+        self.msg_source = pkt_source
         self.voltage = float(voltage) / 10
         self.current = float(current) / 10
         self.hardware_failure = (flags & 0x01) != 0
@@ -109,7 +110,23 @@ class ElconUtils(object):
         msg.dlc = 5
         # Send a message from us (source) to the destination
         msg.arbitration_id = self.pack_elcon_id(self.our_id, pkt_dest)
-        flags = 1 if enable else 0
+        if pkt_dest == elcon_charger_id:
+            # Message to charger
+            flags = 1 if enable else 0
+        else:
+            # Message from charger to rest of world
+            flags = 0
+            if self.hardware_failure:
+                flags &= 0x01
+            if self.over_temperature:
+                flags &= 0x02
+            if self.input_voltage:
+                flags &= 0x04
+            if self.no_battery:
+                flags &= 0x08
+            if self.timeout:
+                flags &= 0x10
+
         msg.data = pack(">HHB", v, i, flags)
         msg.is_extended_id = True
         return msg
