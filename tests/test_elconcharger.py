@@ -38,9 +38,25 @@ class ElconUtilsTests(unittest.TestCase):
 
         # Add tests of failure modes here
 
-    def test_pack_status(self):
+    def test_pack_status_to_charger(self):
         eu = ElconUtils(elcon_manager_id)
         msg = eu.pack_command(elcon_charger_id, 51.2, 3.2, True)
         self.assertIsInstance(msg, Message)
         self.assertEqual(msg.arbitration_id, magic_id)
         self.assertEqual(msg.data, b'\x02\x00\x00\x20\x01')
+
+    def test_pack_status_to_manager(self):
+        eu = ElconUtils(elcon_charger_id)
+        msg = eu.pack_command(elcon_manager_id, 51.2, 3.2, True)
+        self.assertIsInstance(msg, Message)
+        self.assertEqual(msg.arbitration_id, 0x1806F4E5)
+        # Current status is all OK
+        self.assertEqual(msg.data, b'\x02\x00\x00\x20\x00')
+        # Try setting some flags and see what happens
+        eu.hardware_failure = True
+        eu.input_voltage = True
+        eu.no_battery = True
+        msg = eu.pack_command(elcon_manager_id, 51.2, 3.2, True)
+        self.assertIsInstance(msg, Message)
+        self.assertEqual(msg.arbitration_id, 0x1806F4E5)
+        self.assertEqual(msg.data, b'\x02\x00\x00\x20\x0D')
