@@ -11,7 +11,6 @@ class Battery(object):
     charge_state = 5
     cells = 1  # number of cells
     minimum_voltage = 3.0  # volts
-    storage_voltage = 3.75  # volts
     maximum_voltage = 4.2  # volts
 
     def __init__(self, capacity: float, cells: int):
