@@ -5,7 +5,7 @@ import asyncio
 import can
 
 from battery import Battery
-from elcon_frames import (
+from utils import (
     ElconUtils, elcon_charger_id, elcon_manager_id, elcon_broadcast_id
 )
 
