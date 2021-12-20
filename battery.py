@@ -46,7 +46,8 @@ class Battery(object):
     def discharge(self, amps: float, seconds: float):
         """
         Subtract amp-hours from the battery, by producing the given amps over
-        the given number of seconds.
+        the given number of seconds.  Will not discharge the battery below
+        zero charge.
         """
         self.charge_state -= (amps * seconds) / 3600
         if self.charge_state < 0:
