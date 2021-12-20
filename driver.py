@@ -83,3 +83,8 @@ class ChargerDriver(object):
             self.receive_status(),
         )
         notifier.stop()
+
+    def __repr__(self):
+        if not self.running:
+            return f"ChargerDriver: not running"
+        return f"ChargerDriver: running at {self.volts:.2f}V {self.amps:.2f}A"
