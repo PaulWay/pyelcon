@@ -98,3 +98,8 @@ class ElconCharger(object):
             self.read_messages(),
         )
         notifier.stop()
+
+    def __repr__(self):
+        if not self.active:
+            return f"ElconCharger: inactive"
+        return f"ElconCharger: active at {self.voltage:.2f}V {self.current:.2f}A"
